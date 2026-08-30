@@ -62,6 +62,14 @@ export const pageMeta: Record<string, { title: string; subtitle: string }> = {
     title: "出産・産次の登録",
     subtitle: "生存頭数から個体を自動作成",
   },
+  "/breeding/[id]": {
+    title: "繁殖実施の詳細",
+    subtitle: "交配の記録・出産の結果・数値規制の判定",
+  },
+  "/breeding/[id]/offspring": {
+    title: "子個体の一括登録",
+    subtitle: "生まれた子の情報をまとめて入力",
+  },
   "/health/new": {
     title: "健康・ワクチン記録の追加",
     subtitle: "個体カルテに記録を1件足す",
@@ -106,5 +114,33 @@ export const pageMeta: Record<string, { title: string; subtitle: string }> = {
   "/settings": {
     title: "スタッフ・事業者設定",
     subtitle: "登録情報と数値規制の判定値",
+  },
+  "/animals/[id]/sell": {
+    title: "販売登録",
+    subtitle: "個体カルテから販売の内容を記録",
+  },
+  "/animals/[id]/chip": {
+    title: "マイクロチップ情報",
+    subtitle: "装着と環境省データベース登録",
+  },
+  "/animals/[id]/birthdate": {
+    title: "生年月日の変更依頼",
+    subtitle: "協会への申請",
+  },
+  "/transfers/new": {
+    title: "事業所間移動の登録",
+    subtitle: "個体の移動元・移動先を記録",
+  },
+  "/contracts/new": {
+    title: "契約の作成",
+    subtitle: "販売確認書と8週齢規制の判定",
+  },
+  "/staff/new": {
+    title: "スタッフの追加",
+    subtitle: "勤務形態と権限を登録",
+  },
+  "/reports/new": {
+    title: "定期報告の作成",
+    subtitle: "帳簿の記録から自動集計してPDFにする",
   },
 };

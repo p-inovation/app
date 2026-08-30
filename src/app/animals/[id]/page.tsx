@@ -154,7 +154,11 @@ export default async function AnimalDetailPage({
             title={`引渡しは ${formatJpDate(compliance.sellableFrom)} 以降にしてください`}
             description="生後56日を経過しない犬は販売・引渡しができません。契約 CT-2026-0088 の引渡予定日は 8月30日 で、解禁日より3日早い設定です。日付を直すか、契約を保留にしてください。"
             action={
-              <Button className="bg-[#b2402f] text-white hover:bg-[#b2402f]/90">
+              <Button
+                nativeButton={false}
+                render={<Link href="/contracts" />}
+                className="bg-[#b2402f] text-white hover:bg-[#b2402f]/90"
+              >
                 引渡日を直す
               </Button>
             }
@@ -164,22 +168,73 @@ export default async function AnimalDetailPage({
 
       {/* アクション行 */}
       <div className="mt-4 flex flex-wrap gap-2">
-        <Button className="h-10 bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button
+          nativeButton={false}
+          render={<Link href={`/animals/${animal.id}/sell`} />}
+          variant={compliance.isSellable === false ? "outline" : undefined}
+          className={
+            compliance.isSellable === false
+              ? "h-10 bg-card"
+              : "h-10 bg-primary text-primary-foreground hover:bg-primary/90"
+          }
+        >
+          {compliance.isSellable === false
+            ? "販売登録（要件未充足）"
+            : "販売を登録"}
+        </Button>
+        <Button
+          nativeButton={false}
+          render={<Link href="/photos/new" />}
+          className="h-10 bg-primary text-primary-foreground hover:bg-primary/90"
+        >
           ＋ 今日の写真
         </Button>
-        <Button variant="outline" className="h-10 bg-card">
+        <Button
+          nativeButton={false}
+          render={<Link href="/health/new" />}
+          variant="outline"
+          className="h-10 bg-card"
+        >
           ＋ 健康・ワクチン記録
         </Button>
-        <Button variant="outline" className="h-10 bg-card">
+        <Button
+          nativeButton={false}
+          render={<Link href="/weights/new" />}
+          variant="outline"
+          className="h-10 bg-card"
+        >
           ＋ 体重を記録
         </Button>
-        <Button variant="outline" className="h-10 bg-card">
+        <Button
+          nativeButton={false}
+          render={<Link href={`/animals/${animal.id}/chip`} />}
+          variant="outline"
+          className="h-10 bg-card"
+        >
           チップ情報を編集
         </Button>
-        <Button variant="outline" className="h-10 bg-card">
+        <Button
+          nativeButton={false}
+          render={<Link href={`/animals/${animal.id}/birthdate`} />}
+          variant="outline"
+          className="h-10 bg-card"
+        >
+          生年月日の変更を申請
+        </Button>
+        <Button
+          nativeButton={false}
+          render={<Link href="/contracts" />}
+          variant="outline"
+          className="h-10 bg-card"
+        >
           契約 CT-2026-0088 を開く
         </Button>
-        <Button variant="outline" className="h-10 bg-card">
+        <Button
+          nativeButton={false}
+          render={<Link href="/customers/i7" />}
+          variant="outline"
+          className="h-10 bg-card"
+        >
           予約者 中村 陽子 様
         </Button>
       </div>
@@ -189,7 +244,13 @@ export default async function AnimalDetailPage({
         <PanelHeader
           title="日々の写真"
           action={
-            <Button variant="outline" size="sm" className="h-8 bg-card">
+            <Button
+              nativeButton={false}
+              render={<Link href="/photos/new" />}
+              variant="outline"
+              size="sm"
+              className="h-8 bg-card"
+            >
               ＋ 写真を登録
             </Button>
           }
@@ -226,7 +287,13 @@ export default async function AnimalDetailPage({
           <PanelHeader
             title="健康・ワクチンの記録"
             action={
-              <Button variant="outline" size="sm" className="h-8 bg-card">
+              <Button
+                nativeButton={false}
+                render={<Link href="/health/new" />}
+                variant="outline"
+                size="sm"
+                className="h-8 bg-card"
+              >
                 ＋ 通院記録を追加
               </Button>
             }

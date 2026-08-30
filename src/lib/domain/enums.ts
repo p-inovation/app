@@ -149,3 +149,176 @@ export const chipStatusLabel: Record<ChipStatus, string> = {
   implanted_only: "DB未登録",
   none: "未装着",
 };
+
+/**
+ * 不妊去勢措置の実施状況（schema.sql neuter_status）
+ */
+export const NEUTER_STATUS = ["none", "done", "unknown"] as const;
+export type NeuterStatus = (typeof NEUTER_STATUS)[number];
+export const neuterStatusLabel: Record<NeuterStatus, string> = {
+  none: "未実施",
+  done: "実施済",
+  unknown: "不明",
+};
+
+/** 有無（遺伝性疾患・病歴など。schema.sql presence） */
+export const PRESENCE = ["none", "present", "unknown"] as const;
+export type Presence = (typeof PRESENCE)[number];
+export const presenceLabel: Record<Presence, string> = {
+  none: "無し",
+  present: "有り",
+  unknown: "不明",
+};
+
+/** 販売先区分（schema.sql buyer_type） */
+export const BUYER_TYPE = ["consumer", "business", "auction"] as const;
+export type BuyerType = (typeof BUYER_TYPE)[number];
+export const buyerTypeLabel: Record<BuyerType, string> = {
+  consumer: "一般消費者",
+  business: "事業者",
+  auction: "競り・パーク",
+};
+
+/** 業態区分（schema.sql business_type / 要件 §3.1） */
+export const BUSINESS_TYPE = [
+  "breeder",
+  "breeder_retail",
+  "retail",
+  "wholesale",
+  "multi_store",
+] as const;
+export type BusinessType = (typeof BUSINESS_TYPE)[number];
+export const businessTypeLabel: Record<BusinessType, string> = {
+  breeder: "繁殖業（専業）",
+  breeder_retail: "繁殖＋小売",
+  retail: "小売（ペットショップ）",
+  wholesale: "卸・競り",
+  multi_store: "多店舗事業者",
+};
+
+/** 選択肢マスタの種別（schema.sql lookup_kind / FR-12） */
+export const LOOKUP_KIND = [
+  "vaccine",
+  "medication",
+  "genetic_test",
+  "park_venue",
+  "pedigree_org",
+  "retire_reason",
+] as const;
+export type LookupKind = (typeof LOOKUP_KIND)[number];
+export const lookupKindLabel: Record<LookupKind, string> = {
+  vaccine: "ワクチン",
+  medication: "投薬名",
+  genetic_test: "遺伝子病検査",
+  park_venue: "パーク会場",
+  pedigree_org: "血統書団体",
+  retire_reason: "引退候補理由",
+};
+
+/** 交配チェックの判定項目（openapi.yaml MatingCheckResult.findings[].rule / FR-43） */
+export const MATING_CHECK_RULE = [
+  "inbreeding",
+  "dam_age_limit",
+  "lifetime_birth_limit",
+  "interval_since_last_birth",
+  "breeding_prohibited_flag",
+  "genetic_test",
+] as const;
+export type MatingCheckRule = (typeof MATING_CHECK_RULE)[number];
+export const matingCheckRuleLabel: Record<MatingCheckRule, string> = {
+  inbreeding: "近親度",
+  dam_age_limit: "雌の年齢上限",
+  lifetime_birth_limit: "生涯出産回数",
+  interval_since_last_birth: "前回出産からの間隔",
+  breeding_prohibited_flag: "繁殖禁止フラグ",
+  genetic_test: "遺伝子病検査",
+};
+
+/** ダッシュボードのタスク種別（schema.sql task_kind / FR-03） */
+export const TASK_KIND = [
+  "inspection_due",
+  "vaccine_due",
+  "rabies_due",
+  "checkup_due",
+  "delivery_due",
+  "pedigree_pending",
+  "annual_report_due",
+  "license_renewal_due",
+  "microchip_missing",
+  "eight_week_reached",
+] as const;
+export type TaskKind = (typeof TASK_KIND)[number];
+
+/** 通知の3段階（schema.sql task_severity / FR-04）。色だけでなくラベルを併記する（要件 §9.5） */
+export const TASK_SEVERITY = ["info", "warning", "overdue"] as const;
+export type TaskSeverity = (typeof TASK_SEVERITY)[number];
+export const taskSeverityLabel: Record<TaskSeverity, string> = {
+  info: "1ヶ月前",
+  warning: "2週間前",
+  overdue: "期限超過",
+};
+
+/** 帳票の種別（schema.sql report_kind / 要件 §8） */
+export const REPORT_KIND = [
+  "annual_report",
+  "retire_check",
+  "breeding_ledger",
+  "animal_ledger",
+  "sales_confirmation",
+  "inspection_ledger",
+] as const;
+export type ReportKind = (typeof REPORT_KIND)[number];
+export const reportKindLabel: Record<ReportKind, string> = {
+  annual_report: "動物販売業者等定期報告届出書",
+  retire_check: "繁殖引退犬・猫チェック",
+  breeding_ledger: "繁殖実施状況記録台帳",
+  animal_ledger: "犬猫生体管理帳簿",
+  sales_confirmation: "販売確認書",
+  inspection_ledger: "点検状況記録台帳",
+};
+
+/** 生年月日変更依頼の状態（schema.sql birthdate_request_status / FR-26） */
+export const BIRTHDATE_REQUEST_STATUS = [
+  "pending",
+  "approved",
+  "rejected",
+] as const;
+export type BirthdateRequestStatus = (typeof BIRTHDATE_REQUEST_STATUS)[number];
+export const birthdateRequestStatusLabel: Record<
+  BirthdateRequestStatus,
+  string
+> = {
+  pending: "申請中",
+  approved: "承認済",
+  rejected: "却下",
+};
+
+// ---------------------------------------------------------------------------
+// 派生値
+// DB に列を持たず、複数列から画面表示用に導出する概念。
+// ---------------------------------------------------------------------------
+
+/**
+ * 台帳区分を animals.status と animals.is_breeding_animal から導出する。
+ * DB に対応する ENUM は無い（表示のためだけの区分）。
+ */
+export function deriveLedgerCategory(animal: {
+  status: AnimalStatus;
+  isBreedingAnimal: boolean;
+}): LedgerCategory {
+  if (animal.status === "sold") return "sold";
+  if (animal.status === "retired") return "retired";
+  return animal.isBreedingAnimal ? "breeding" : "for_sale";
+}
+
+/**
+ * チップの状況を animals の2列から導出する。
+ * v_animal_compliance の has_microchip / is_microchip_registered と同じ判定。
+ */
+export function deriveChipStatus(animal: {
+  microchipNo: string | null;
+  microchipRegisteredOn: string | null;
+}): ChipStatus {
+  if (!animal.microchipNo) return "none";
+  return animal.microchipRegisteredOn ? "registered" : "implanted_only";
+}

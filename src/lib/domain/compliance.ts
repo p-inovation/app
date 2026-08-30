@@ -6,7 +6,7 @@
  * 販売できない個体には販売ボタンを出さない、という判断に使う。
  */
 
-import type { ChipStatus } from "./enums";
+import type { AnimalStatus, ChipStatus } from "./enums";
 
 /** 8週齢規制：生後56日を経過しない犬猫は販売・引渡しができない */
 export const EIGHT_WEEK_DAYS = 56;
@@ -58,10 +58,17 @@ export function sellableFrom(birthDate: Date): Date {
   return addDays(birthDate, EIGHT_WEEK_DAYS);
 }
 
+/**
+ * 販売登録を拒否する理由。
+ * openapi.yaml の ComplianceError.violations[].rule と同じ値を持つ（422 応答の判別に使う）。
+ */
 export type ComplianceRule =
   | "eight_week_rule"
   | "microchip_required"
-  | "microchip_not_registered";
+  | "microchip_not_registered"
+  | "breeding_prohibited"
+  | "already_sold"
+  | "already_dead";
 
 export type ComplianceViolation = {
   rule: ComplianceRule;
@@ -74,6 +81,10 @@ export type ComplianceInput = {
   birthDate: Date;
   chipStatus: ChipStatus;
   today: Date;
+  /** 個体の状態。販売済・死亡は販売登録できない */
+  status?: AnimalStatus;
+  /** 健康記録の繁殖禁止フラグ（health_records.breeding_prohibited）が立っているか */
+  breedingProhibited?: boolean;
 };
 
 export type ComplianceResult = {
@@ -96,6 +107,8 @@ export function evaluateCompliance({
   birthDate,
   chipStatus,
   today,
+  status,
+  breedingProhibited = false,
 }: ComplianceInput): ComplianceResult {
   const from = sellableFrom(birthDate);
   const remaining = Math.max(0, daysBetween(today, from));
@@ -120,6 +133,25 @@ export function evaluateCompliance({
       rule: "microchip_not_registered",
       message:
         "装着済みですが環境省データベースに未登録です。販売前に登録が必要です。",
+    });
+  }
+  if (status === "sold") {
+    violations.push({
+      rule: "already_sold",
+      message: "すでに販売済みの個体です。",
+    });
+  }
+  if (status === "dead") {
+    violations.push({
+      rule: "already_dead",
+      message: "死亡が登録されている個体です。",
+    });
+  }
+  if (breedingProhibited) {
+    violations.push({
+      rule: "breeding_prohibited",
+      message:
+        "健康記録で繁殖禁止が設定されています。繁殖の用に供することはできません。",
     });
   }
 

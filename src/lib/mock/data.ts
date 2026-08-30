@@ -4,9 +4,11 @@
  */
 
 import type {
+  AnimalStatus,
   BreedingStatus,
   ChipStatus,
   LedgerCategory,
+  LookupKind,
   MatingCheckResult,
   PedigreeStatus,
   Sex,
@@ -38,10 +40,27 @@ export const currentUser: CurrentUser = {
   title: "動物取扱責任者",
 };
 
+/**
+ * 画面表示用の個体。
+ *
+ * schema.sql の `animals` テーブルと1対1ではなく、
+ * 画面がすぐ使える形（派生値を含む）に整えたビューモデルとして扱う。
+ * API 接続時は openapi.yaml の AnimalSummary / AnimalDetail からここへ詰め替える。
+ *
+ * DB との対応:
+ * - registeredName … animals.pedigree_animal_name（血統書用生体名）
+ * - chipStatus     … microchip_no と microchip_registered_on から導出（deriveChipStatus）
+ * - category       … status と is_breeding_animal から導出（deriveLedgerCategory）
+ * - currentWeightG … weight_records の最新値（animals 自体には列が無い）
+ * - litterNo       … animals.breeding_record_id が指す繁殖実施の表示用ID
+ * - maxBirthCount  … 個体の列ではなく thresholds.maxLifetimeBirths（事業所設定）
+ * - note           … DB に無い。モックアップの補足文言をそのまま持つ表示専用
+ */
 export type Animal = {
   id: string;
   ledgerNo: string;
   callName: string;
+  /** = animals.pedigree_animal_name */
   registeredName: string;
   species: Species;
   breed: string;
@@ -59,6 +78,12 @@ export type Animal = {
   lifetimeBirthCount?: number;
   maxBirthCount?: number;
   lastDeliveredOn?: Date;
+  /** animals.status。販売可否の判定に使う */
+  status?: AnimalStatus;
+  /** animals.is_breeding_animal */
+  isBreedingAnimal?: boolean;
+  /** health_records.breeding_prohibited が立っているか */
+  breedingProhibited?: boolean;
 };
 
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
@@ -77,6 +102,8 @@ export const animals: Animal[] = [
     category: "for_sale",
     note: "予約済・8週齢待ち",
     pedigreeStatus: "applied",
+    status: "active",
+    isBreedingAnimal: false,
     coatColor: "レッド",
     currentWeightG: 1180,
     litterNo: "LIT-0037",
@@ -94,6 +121,8 @@ export const animals: Animal[] = [
     category: "for_sale",
     note: "8週齢待ち",
     pedigreeStatus: "applied",
+    status: "active",
+    isBreedingAnimal: false,
     coatColor: "アプリコット",
     currentWeightG: 1240,
     litterNo: "LIT-0037",
@@ -111,6 +140,8 @@ export const animals: Animal[] = [
     category: "for_sale",
     note: "8週齢待ち",
     pedigreeStatus: "applied",
+    status: "active",
+    isBreedingAnimal: false,
     coatColor: "レッド",
     currentWeightG: 1090,
     litterNo: "LIT-0037",
@@ -128,6 +159,8 @@ export const animals: Animal[] = [
     category: "for_sale",
     note: "すぐ引き渡せる",
     pedigreeStatus: "arrived",
+    status: "active",
+    isBreedingAnimal: false,
     coatColor: "赤",
     currentWeightG: 3200,
   },
@@ -144,6 +177,8 @@ export const animals: Animal[] = [
     category: "for_sale",
     note: "予約済・引渡 09-06",
     pedigreeStatus: "arrived",
+    status: "active",
+    isBreedingAnimal: false,
     coatColor: "オレンジ",
     currentWeightG: 1650,
     litterNo: "LIT-0036",
@@ -161,6 +196,8 @@ export const animals: Animal[] = [
     category: "breeding",
     note: "交配可・産後休養中",
     pedigreeStatus: "shipped",
+    status: "active",
+    isBreedingAnimal: true,
     lifetimeBirthCount: 3,
     maxBirthCount: 6,
     lastDeliveredOn: d(2026, 7, 8),
@@ -178,6 +215,8 @@ export const animals: Animal[] = [
     category: "breeding",
     note: "妊娠中・出産 10-01",
     pedigreeStatus: "shipped",
+    status: "active",
+    isBreedingAnimal: true,
     lifetimeBirthCount: 2,
     maxBirthCount: 6,
     lastDeliveredOn: d(2026, 2, 11),
@@ -195,6 +234,8 @@ export const animals: Animal[] = [
     category: "breeding",
     note: "交配可・残り36日",
     pedigreeStatus: "shipped",
+    status: "active",
+    isBreedingAnimal: true,
     lifetimeBirthCount: 4,
     maxBirthCount: 6,
     lastDeliveredOn: d(2025, 10, 2),
@@ -212,6 +253,8 @@ export const animals: Animal[] = [
     category: "retired",
     note: "年齢上限超・譲渡先検討",
     pedigreeStatus: "shipped",
+    status: "retired",
+    isBreedingAnimal: true,
     lifetimeBirthCount: 5,
     maxBirthCount: 6,
     lastDeliveredOn: d(2025, 4, 18),
@@ -229,6 +272,8 @@ export const animals: Animal[] = [
     category: "sold",
     note: "08-16 引渡し済",
     pedigreeStatus: "shipped",
+    status: "sold",
+    isBreedingAnimal: false,
     litterNo: "LIT-0035",
   },
 ];
@@ -748,3 +793,51 @@ export const customerEvents: CustomerEvent[] = [
   { id: "c4", date: "08-14", title: "見学（1回目）", detail: "モモ・コハクを見学。室内飼い・先住犬なし。", tone: "alert" },
   { id: "c5", date: "08-10", title: "問い合わせ（自社サイト）", detail: "トイ・プードル レッドを希望。予算50万円まで。", tone: "done" },
 ];
+
+/**
+ * 選択肢マスタ（schema.sql lookups / FR-12）のモック。
+ * 健康記録フォームのワクチン・投薬・遺伝子検査の選択肢に使う。
+ */
+export type Lookup = {
+  id: string;
+  kind: LookupKind;
+  code: string;
+  name: string;
+};
+
+export const lookups: Lookup[] = [
+  { id: "lk-vac-1", kind: "vaccine", code: "vac_5", name: "5種混合" },
+  { id: "lk-vac-2", kind: "vaccine", code: "vac_7", name: "7種混合" },
+  { id: "lk-vac-3", kind: "vaccine", code: "vac_rabies", name: "狂犬病" },
+  {
+    id: "lk-med-1",
+    kind: "medication",
+    code: "med_internal_parasite",
+    name: "内部寄生虫 予防薬",
+  },
+  {
+    id: "lk-med-2",
+    kind: "medication",
+    code: "med_flea_tick",
+    name: "ノミ・ダニ 予防薬",
+  },
+  {
+    id: "lk-med-3",
+    kind: "medication",
+    code: "med_heartworm",
+    name: "フィラリア予防薬",
+  },
+  { id: "lk-gt-1", kind: "genetic_test", code: "gt_pra", name: "PRA" },
+  { id: "lk-gt-2", kind: "genetic_test", code: "gt_gm1", name: "GM1" },
+  {
+    id: "lk-gt-3",
+    kind: "genetic_test",
+    code: "gt_patella",
+    name: "膝蓋骨脱臼",
+  },
+];
+
+/** kind ごとの選択肢を取り出す（SegmentGroup の options に渡す） */
+export function lookupsByKind(kind: LookupKind): Lookup[] {
+  return lookups.filter((l) => l.kind === kind);
+}

@@ -3,6 +3,8 @@
  * 状態が要らないため Server Component。
  */
 
+import Link from "next/link";
+
 import { PageBody, Panel, PanelHeader, StatBlock } from "@/components/domain/page-parts";
 import { ChipStatusChip } from "@/components/compliance/chip-status-chip";
 import { Button } from "@/components/ui/button";
@@ -51,7 +53,12 @@ export default function MicrochipPage() {
           title="登録の進み具合"
           description="2022年6月から、販売する犬はマイクロチップの装着と環境省データベースへの登録が義務です"
           action={
-            <Button size="sm" className="h-9 bg-[#23262a] text-white hover:bg-[#23262a]/85">
+            <Button
+              nativeButton={false}
+              render={<Link href="/microchip/register" />}
+              size="sm"
+              className="h-9 bg-[#23262a] text-white hover:bg-[#23262a]/85"
+            >
               未登録5件をまとめて申請
             </Button>
           }
@@ -91,15 +98,16 @@ export default function MicrochipPage() {
                     <ChipStatusChip status={row.status} label={row.statusLabel} />
                   </TableCell>
                   <TableCell className="py-3 pr-4 text-[13px] whitespace-nowrap">
-                    <span
+                    <Link
+                      href="/microchip/register"
                       className={
                         row.nextActionUrgent
-                          ? "font-medium text-[#a95f42]"
-                          : "text-muted-foreground"
+                          ? "font-medium text-[#a95f42] hover:underline"
+                          : "text-muted-foreground hover:underline"
                       }
                     >
                       {row.nextAction}
-                    </span>
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}
@@ -137,15 +145,16 @@ export default function MicrochipPage() {
               </div>
               <p className="mt-3 text-[12.5px]">
                 <span className="text-muted-foreground">次にやること　</span>
-                <span
+                <Link
+                  href="/microchip/register"
                   className={
                     row.nextActionUrgent
-                      ? "font-medium text-[#a95f42]"
-                      : "text-muted-foreground"
+                      ? "font-medium text-[#a95f42] hover:underline"
+                      : "text-muted-foreground hover:underline"
                   }
                 >
                   {row.nextAction}
-                </span>
+                </Link>
               </p>
             </div>
           ))}

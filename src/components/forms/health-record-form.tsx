@@ -2,7 +2,7 @@
 
 /**
  * 健康・ワクチン記録の追加フォーム（画面 s_f_health.html を再現）。
- * 記録の種類（ワクチン/駆虫/検査/通院・治療）で入力項目を出し分ける。
+ * 記録の種類（ワクチン/狂犬病/駆虫/検査/通院・治療）で入力項目を出し分ける。
  */
 
 import { useRouter } from "next/navigation";
@@ -23,6 +23,8 @@ import { NoticeBar, Panel } from "@/components/domain/page-parts";
 import { Textarea } from "@/components/ui/textarea";
 import {
   healthRecordInputSchema,
+  healthRecordFormSchema,
+  type HealthRecordForm as HealthRecordFormValues,
   type HealthRecordInput,
 } from "@/lib/domain/schemas";
 import {
@@ -30,31 +32,62 @@ import {
   healthRecordTypeLabel,
   type HealthRecordType,
 } from "@/lib/domain/enums";
+import { lookupsByKind, TODAY } from "@/lib/mock/data";
+import { formatIsoDate } from "@/lib/domain/compliance";
 
 import { FormHeaderBar } from "./form-header-bar";
 
 /** 対象個体（LIT-0037 の3頭）。モックアップの「3頭にまとめて記録」に合わせて固定 */
 const TARGET_ANIMAL_IDS = ["a-0142", "a-0143", "a-0141"];
 
-/** ワクチンの種類の選択肢 */
-const VACCINE_OPTIONS = [
-  { value: "5種混合", label: "5種混合" },
-  { value: "7種混合", label: "7種混合" },
-  { value: "狂犬病", label: "狂犬病" },
-] as const;
+const VACCINE_LOOKUPS = lookupsByKind("vaccine");
+const MEDICATION_LOOKUPS = lookupsByKind("medication");
+const GENETIC_TEST_LOOKUPS = lookupsByKind("genetic_test");
+
+const VACCINE_OPTIONS = VACCINE_LOOKUPS.map((l) => ({
+  value: l.id,
+  label: l.name,
+}));
+const MEDICATION_OPTIONS = MEDICATION_LOOKUPS.map((l) => ({
+  value: l.id,
+  label: l.name,
+}));
+const GENETIC_TEST_OPTIONS = GENETIC_TEST_LOOKUPS.map((l) => ({
+  value: l.id,
+  label: l.name,
+}));
 
 /** 前回の記録（HintBar「前回と同じ」で流し込む値） */
 const PREVIOUS_RECORD = {
   recordType: "vaccine" as const,
-  vaccineName: "5種混合",
+  vaccineId: VACCINE_LOOKUPS.find((l) => l.code === "vac_5")?.id ?? "lk-vac-1",
   lotNo: "MJ-4471",
   veterinarian: "白川動物病院 佐々木",
 };
 
-const RECORD_TYPE_OPTIONS = HEALTH_FORM_TYPES.map((value) => ({
-  value,
-  label: healthRecordTypeLabel[value],
-}));
+/** 記録の種類の選択肢。狂犬病はワクチンの一種として5つ目に足す */
+const RECORD_TYPE_OPTIONS = [
+  ...HEALTH_FORM_TYPES.map((value) => ({
+    value,
+    label: healthRecordTypeLabel[value],
+  })),
+  { value: "rabies" as const, label: healthRecordTypeLabel.rabies },
+];
+
+/**
+ * 画面の入力値（animalIds/lotNo/veterinarian を含む）を、
+ * API が受ける healthRecordInputSchema の形へ分解する。
+ * API は POST /animals/{animalId}/health-records で1頭ずつ受ける設計のため、
+ * 対象の各個体に同じ内容を送るにはここでループして分解する必要がある。
+ */
+function toHealthRecordInputs(
+  form: HealthRecordFormValues,
+): HealthRecordInput[] {
+  const { animalIds, lotNo, veterinarian, ...base } = form;
+  void lotNo;
+  void veterinarian;
+  return animalIds.map(() => ({ ...base }));
+}
 
 export function HealthRecordForm() {
   const router = useRouter();
@@ -65,10 +98,10 @@ export function HealthRecordForm() {
     control,
     setValue,
     formState: { errors, isSubmitting },
-  } = useForm<HealthRecordInput>({
-    resolver: zodResolver(healthRecordInputSchema),
+  } = useForm<HealthRecordFormValues>({
+    resolver: zodResolver(healthRecordFormSchema),
     defaultValues: {
-      recordedOn: "2026-08-25",
+      recordedOn: formatIsoDate(TODAY),
       recordType: "vaccine",
       veterinarian: "白川動物病院 佐々木",
       animalIds: TARGET_ANIMAL_IDS,
@@ -76,17 +109,24 @@ export function HealthRecordForm() {
   });
 
   const recordType = useWatch({ control, name: "recordType" });
-  const vaccineName = useWatch({ control, name: "vaccineName" });
+  const vaccineId = useWatch({ control, name: "vaccineId" });
+  const medicationId = useWatch({ control, name: "medicationId" });
+  const geneticTestId = useWatch({ control, name: "geneticTestId" });
+  const animalIds = useWatch({ control, name: "animalIds" });
 
   const applyPreviousRecord = () => {
     setValue("recordType", PREVIOUS_RECORD.recordType);
-    setValue("vaccineName", PREVIOUS_RECORD.vaccineName);
+    setValue("vaccineId", PREVIOUS_RECORD.vaccineId);
     setValue("lotNo", PREVIOUS_RECORD.lotNo);
     setValue("veterinarian", PREVIOUS_RECORD.veterinarian);
   };
 
-  const onSubmit = () => {
-    toast.success("健康・ワクチン記録を登録しました");
+  const onSubmit = (values: HealthRecordFormValues) => {
+    const parsed = healthRecordFormSchema.parse(values);
+    const records = toHealthRecordInputs(parsed).map((r) =>
+      healthRecordInputSchema.parse(r),
+    );
+    toast.success(`${records.length}頭に記録しました`);
     router.push("/");
   };
 
@@ -134,18 +174,47 @@ export function HealthRecordForm() {
             <FormRow>
               <FieldLabel required>ワクチンの種類</FieldLabel>
               <SegmentGroup<string>
-                name="vaccineName"
+                name="vaccineId"
                 options={VACCINE_OPTIONS}
-                value={vaccineName}
-                onChange={(next) => setValue("vaccineName", next)}
+                value={vaccineId}
+                onChange={(next) => setValue("vaccineId", next)}
               />
-              <FieldError message={errors.vaccineName?.message} />
+              <FieldError message={errors.vaccineId?.message} />
             </FormRow>
 
+            {/* lotNo は schema.sql・openapi.yaml のどちらにも対応する列が無い画面専用項目 */}
             <FormRow>
-              <FieldLabel htmlFor="lotNo" required>
-                ロット番号
+              <FieldLabel htmlFor="lotNo">ロット番号</FieldLabel>
+              <input
+                id="lotNo"
+                type="text"
+                placeholder="MJ-4471"
+                className="min-h-11 w-full rounded-lg border border-input bg-transparent px-3 text-[13.5px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                {...register("lotNo")}
+              />
+              <FieldError message={errors.lotNo?.message} />
+            </FormRow>
+          </>
+        ) : null}
+
+        {recordType === "rabies" ? (
+          <>
+            <FormRow>
+              <FieldLabel htmlFor="rabiesCertNo" required>
+                接種済票No
               </FieldLabel>
+              <input
+                id="rabiesCertNo"
+                type="text"
+                className="min-h-11 w-full rounded-lg border border-input bg-transparent px-3 text-[13.5px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                {...register("rabiesCertNo")}
+              />
+              <FieldError message={errors.rabiesCertNo?.message} />
+            </FormRow>
+
+            {/* lotNo は schema.sql・openapi.yaml のどちらにも対応する列が無い画面専用項目 */}
+            <FormRow>
+              <FieldLabel htmlFor="lotNo">ロット番号</FieldLabel>
               <input
                 id="lotNo"
                 type="text"
@@ -160,28 +229,28 @@ export function HealthRecordForm() {
 
         {recordType === "preventive" ? (
           <FormRow>
-            <FieldLabel htmlFor="medicationName">投薬名</FieldLabel>
-            <input
-              id="medicationName"
-              type="text"
-              className="min-h-11 w-full rounded-lg border border-input bg-transparent px-3 text-[13.5px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              {...register("medicationName")}
+            <FieldLabel required>投薬名</FieldLabel>
+            <SegmentGroup<string>
+              name="medicationId"
+              options={MEDICATION_OPTIONS}
+              value={medicationId}
+              onChange={(next) => setValue("medicationId", next)}
             />
-            <FieldError message={errors.medicationName?.message} />
+            <FieldError message={errors.medicationId?.message} />
           </FormRow>
         ) : null}
 
         {recordType === "genetic_test" ? (
           <>
             <FormRow>
-              <FieldLabel htmlFor="geneticTestName">検査名</FieldLabel>
-              <input
-                id="geneticTestName"
-                type="text"
-                className="min-h-11 w-full rounded-lg border border-input bg-transparent px-3 text-[13.5px] outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-                {...register("geneticTestName")}
+              <FieldLabel required>検査名</FieldLabel>
+              <SegmentGroup<string>
+                name="geneticTestId"
+                options={GENETIC_TEST_OPTIONS}
+                value={geneticTestId}
+                onChange={(next) => setValue("geneticTestId", next)}
               />
-              <FieldError message={errors.geneticTestName?.message} />
+              <FieldError message={errors.geneticTestId?.message} />
             </FormRow>
             <FormRow>
               <FieldLabel htmlFor="geneticTestResult">結果</FieldLabel>
@@ -210,6 +279,7 @@ export function HealthRecordForm() {
           </FormRow>
         ) : null}
 
+        {/* veterinarian は schema.sql・openapi.yaml のどちらにも対応する列が無い画面専用項目 */}
         <FormRow>
           <FieldLabel htmlFor="veterinarian" required>
             担当した獣医師
@@ -238,7 +308,7 @@ export function HealthRecordForm() {
 
         <NoticeBar
           tone="info"
-          title="3頭に同じ記録が追加されます"
+          title={`${animalIds?.length ?? 0}頭に同じ記録が追加されます`}
           description="モモ・コハク・ナナのカルテに記録されます。"
         />
 

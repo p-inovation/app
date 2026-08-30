@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { PageBody, Panel, PanelHeader } from "@/components/domain/page-parts";
 import { Button } from "@/components/ui/button";
 import { InquiryBoard } from "@/components/inquiry/inquiry-board";
@@ -18,7 +20,11 @@ export default function InquiriesPage() {
           title="今週の見学予約"
           description="重要事項説明は対面が必要です。見学と同時に済ませる導線を用意しています。"
           action={
-            <Button className="h-9 bg-primary text-primary-foreground hover:bg-primary/90">
+            <Button
+              nativeButton={false}
+              render={<Link href="/inquiries/new" />}
+              className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+            >
               ＋ 引合いを登録
             </Button>
           }

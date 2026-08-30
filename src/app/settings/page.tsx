@@ -3,6 +3,7 @@
  * 入力操作がないため Server Component。
  */
 
+import Link from "next/link";
 import { Pencil } from "lucide-react";
 
 import { Field, PageBody, Panel, PanelHeader } from "@/components/domain/page-parts";
@@ -61,7 +62,14 @@ export default function SettingsPage() {
           title="スタッフ"
           description="常勤の人数が飼養できる上限頭数の計算に使われます"
           action={
-            <Button variant="outline" size="sm" className="h-8 bg-card">
+            <Button
+              // Link は <a> を描画するため、Base UI に native button ではないと伝える
+              nativeButton={false}
+              render={<Link href="/staff/new" />}
+              variant="outline"
+              size="sm"
+              className="h-8 bg-card"
+            >
               ＋ スタッフを追加
             </Button>
           }

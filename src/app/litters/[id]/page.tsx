@@ -52,14 +52,30 @@ export default async function LitterDetailPage({
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm">
+            <Button
+              nativeButton={false}
+              render={<Link href="/photos/new" />}
+              size="sm"
+            >
               <Plus className="size-4" />
               今日の写真
             </Button>
-            <Button variant="outline" size="sm" className="bg-card">
+            <Button
+              nativeButton={false}
+              render={<Link href="/weights/new" />}
+              variant="outline"
+              size="sm"
+              className="bg-card"
+            >
               3頭の体重を記録
             </Button>
-            <Button variant="outline" size="sm" className="bg-card">
+            <Button
+              nativeButton={false}
+              render={<Link href="/health/new" />}
+              variant="outline"
+              size="sm"
+              className="bg-card"
+            >
               3頭にワクチン記録
             </Button>
           </div>
@@ -132,7 +148,13 @@ export default async function LitterDetailPage({
         title="ナナの体重が前週より減っています"
         description="−140 g（前週比 −12%）。同じ産次の2頭は順調に増えています。獣医師への相談をおすすめします。"
         action={
-          <Button variant="outline" size="sm" className="bg-card">
+          <Button
+            nativeButton={false}
+            render={<Link href="/health/new" />}
+            variant="outline"
+            size="sm"
+            className="bg-card"
+          >
             通院記録を追加
           </Button>
         }

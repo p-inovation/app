@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import {
@@ -44,10 +45,19 @@ export default async function CustomerDetailPage({
             {customer.inquiryNo}
           </span>
           <div className="ml-auto flex gap-2">
-            <Button className="h-9 bg-primary text-primary-foreground hover:bg-primary/90">
+            <Button
+              nativeButton={false}
+              render={<Link href="/contracts" />}
+              className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+            >
               契約を開く
             </Button>
-            <Button variant="outline" className="h-9 bg-card">
+            <Button
+              nativeButton={false}
+              render={<Link href="/animals/a-0142" />}
+              variant="outline"
+              className="h-9 bg-card"
+            >
               モモのカルテ
             </Button>
           </div>
@@ -82,7 +92,11 @@ export default async function CustomerDetailPage({
           title="引渡日が8週齢規制に抵触しています"
           description="予定していた 8月30日 は、モモが生後56日に達する 9月2日 より前です。お客さまへの連絡が必要です。"
           action={
-            <Button className="bg-[#b2402f] text-white hover:bg-[#b2402f]/90">
+            <Button
+              nativeButton={false}
+              render={<Link href="/contracts" />}
+              className="bg-[#b2402f] text-white hover:bg-[#b2402f]/90"
+            >
               契約で日付を直す
             </Button>
           }
@@ -158,7 +172,12 @@ export default async function CustomerDetailPage({
           <Panel>
             <PanelHeader title="次にやること" />
             <div className="flex flex-col gap-2 p-4 md:p-5">
-              <Button variant="outline" className="h-10 w-full bg-card">
+              <Button
+                nativeButton={false}
+                render={<Link href="/contracts" />}
+                variant="outline"
+                className="h-10 w-full bg-card"
+              >
                 引渡日を9月2日以降に変更
               </Button>
               <Button variant="outline" className="h-10 w-full bg-card">

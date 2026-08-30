@@ -18,11 +18,21 @@ export default function BreedingPage() {
           description="数値規制（交配時の年齢上限・生涯出産回数）を自動判定"
           action={
             <div className="flex flex-wrap gap-2">
-              <Button size="sm">
+              <Button
+                nativeButton={false}
+                render={<Link href="/breeding/matings/new" />}
+                size="sm"
+              >
                 <Plus className="size-4" />
                 交配を登録
               </Button>
-              <Button variant="outline" size="sm" className="bg-card">
+              <Button
+                nativeButton={false}
+                render={<Link href="/breeding/births/new" />}
+                variant="outline"
+                size="sm"
+                className="bg-card"
+              >
                 <Plus className="size-4" />
                 出産を登録
               </Button>
@@ -81,7 +91,11 @@ export default function BreedingPage() {
           <PanelHeader title="交配・出産の予定" />
           <div className="flex flex-col divide-y divide-border">
             {breedingPlans.map((p) => (
-              <div key={p.id} className="px-4 py-3.5 md:px-5">
+              <Link
+                key={p.id}
+                href={`/breeding/${p.id}`}
+                className="block px-4 py-3.5 hover:bg-muted/50 md:px-5"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <p className="truncate text-[13.5px] font-medium">
@@ -110,7 +124,7 @@ export default function BreedingPage() {
                     {p.rightLabel}
                   </p>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         </Panel>

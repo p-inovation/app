@@ -8,10 +8,15 @@
 import { z } from "zod";
 import {
   ANIMAL_STATUS,
+  BREEDING_STATUS,
+  BUYER_TYPE,
   HEALTH_RECORD_TYPE,
-  PEDIGREE_STATUS,
+  NEUTER_STATUS,
+  PRESENCE,
+  REPORT_KIND,
   SEX,
   SPECIES,
+  USER_ROLE,
 } from "./enums";
 
 /** マイクロチップ番号：15桁数値（schema.sql animals_chip_format_chk） */
@@ -49,19 +54,46 @@ export const animalInputSchema = z
     /** メスは必須（schema.sql 出産履歴グループ） */
     priorBirthCount: z.coerce.number().int().min(0).optional(),
 
+    // ▼ 仕入（自家繁殖個体では入力不要）
+    acquiredOn: isoDateSchema.optional(),
+    acquirePrice: z.coerce.number().int().min(0).optional(),
+    breederName: z.string().max(100).optional(),
+    breederLicenseNo: z.string().max(50).optional(),
+    breederAddress: z.string().max(200).optional(),
+    supplierSameAsBreeder: z.boolean().default(false),
+    supplierName: z.string().max(100).optional(),
+    supplierLicenseNo: z.string().max(50).optional(),
+    supplierAddress: z.string().max(200).optional(),
+
+    // ▼ マイクロチップ
     microchipNo: microchipNoSchema.optional(),
     microchipRegisteredOn: isoDateSchema.optional(),
     microchipImplantedOn: isoDateSchema.optional(),
+    neuterStatus: z.enum(NEUTER_STATUS).default("unknown"),
+    /** 狂犬病予防法にもとづく畜犬登録日 */
+    rabiesLicenseOn: isoDateSchema.optional(),
+    /** 登録（鑑札）番号 */
+    rabiesTagNo: z.string().max(50).optional(),
 
-    pedigreeStatus: z.enum(PEDIGREE_STATUS).default("not_applied"),
+    // ▼ 血統書
+    pedigreeOrgId: z.string().optional(),
     pedigreeNo: z.string().max(50).optional(),
     pedigreeAnimalName: z.string().max(120).optional(),
+    pedigreeAppliedOn: isoDateSchema.optional(),
+    pedigreeArrivedOn: isoDateSchema.optional(),
+    pedigreeShippedOn: isoDateSchema.optional(),
 
+    // ▼ 健康
     /** 「有り」選択時は疾患名を必須（schema.sql animals_genetic_name_chk） */
-    geneticDisease: z.enum(["none", "present", "unknown"]).default("unknown"),
+    geneticDisease: z.enum(PRESENCE).default("unknown"),
     geneticDiseaseName: z.string().max(200).optional(),
-
+    medicalHistory: z.enum(PRESENCE).default("unknown"),
     healthNote: z.string().max(1000).optional(),
+
+    // ▼ 引退（定期報告の繁殖引退チェックの対象）
+    breedingAvailable: z.boolean().optional(),
+    breedingUnavailableOn: isoDateSchema.optional(),
+    retireReasonId: z.string().optional(),
   })
   .refine(
     (v) => v.geneticDisease !== "present" || !!v.geneticDiseaseName?.trim(),
@@ -84,6 +116,14 @@ export const animalInputSchema = z
       message: "登録日は装着日以降の日付を入力してください",
       path: ["microchipRegisteredOn"],
     },
+  )
+  .refine(
+    // 繁殖利用「無し」なら日付を持つ（schema.sql animals_breeding_unavail_chk）
+    (v) => v.breedingAvailable !== false || !!v.breedingUnavailableOn,
+    {
+      message: "繁殖の用に供さない場合はその日付を入力してください",
+      path: ["breedingUnavailableOn"],
+    },
   );
 
 export type AnimalInput = z.input<typeof animalInputSchema>;
@@ -91,39 +131,36 @@ export type AnimalInputParsed = z.output<typeof animalInputSchema>;
 
 /**
  * 健康・ワクチン記録（openapi.yaml HealthRecordInput / FR-27）。
- * 区分により有効項目が変わる。モックアップの「記録の種類」セグメントに対応。
+ *
+ * 選択肢は lookups マスタ（schema.sql）の id を送り、
+ * 一覧に無いものは *Other の自由入力で併存させる（FR-12「その他の場合記入」）。
  */
 export const healthRecordInputSchema = z
   .object({
     recordedOn: isoDateSchema,
     recordType: z.enum(HEALTH_RECORD_TYPE),
 
-    /** ワクチンの種類（5種混合 / 7種混合 / 狂犬病 など） */
-    vaccineName: z.string().max(100).optional(),
-    /** ロット番号：ワクチン接種のときは必須 */
-    lotNo: z.string().max(50).optional(),
-    medicationName: z.string().max(100).optional(),
+    vaccineId: z.string().optional(),
+    vaccineOther: z.string().max(100).optional(),
+    medicationId: z.string().optional(),
+    medicationOther: z.string().max(100).optional(),
     treatmentDetail: z.string().max(1000).optional(),
     /** 狂犬病予防注射の接種済票No（schema.sql hr_rabies_chk） */
     rabiesCertNo: z.string().max(50).optional(),
-    geneticTestName: z.string().max(100).optional(),
+    geneticTestId: z.string().optional(),
+    geneticTestOther: z.string().max(100).optional(),
     geneticTestResult: z.string().max(200).optional(),
-    /** 担当した獣医師 */
-    veterinarian: z.string().max(100).optional(),
     breedingProhibited: z.boolean().default(false),
     note: z.string().max(1000).optional(),
-
-    /** 対象個体。まとめて記録できる（モックアップ「同じ内容を3頭にまとめて記録します」） */
-    animalIds: z.array(z.string()).min(1, "対象の個体を選んでください"),
   })
-  .refine((v) => v.recordType !== "vaccine" || !!v.vaccineName?.trim(), {
-    message: "ワクチンの種類を選んでください",
-    path: ["vaccineName"],
-  })
-  .refine((v) => v.recordType !== "vaccine" || !!v.lotNo?.trim(), {
-    message: "ワクチン接種のときはロット番号が必須です",
-    path: ["lotNo"],
-  })
+  .refine(
+    (v) =>
+      v.recordType !== "vaccine" || !!v.vaccineId || !!v.vaccineOther?.trim(),
+    {
+      message: "ワクチンの種類を選んでください",
+      path: ["vaccineId"],
+    },
+  )
   .refine((v) => v.recordType !== "rabies" || !!v.rabiesCertNo?.trim(), {
     message: "狂犬病予防注射は接種済票Noが必須です",
     path: ["rabiesCertNo"],
@@ -131,9 +168,39 @@ export const healthRecordInputSchema = z
   .refine((v) => v.recordType !== "treatment" || !!v.treatmentDetail?.trim(), {
     message: "通院・治療の内容を入力してください",
     path: ["treatmentDetail"],
-  });
+  })
+  .refine(
+    (v) =>
+      v.recordType !== "preventive" ||
+      !!v.medicationId ||
+      !!v.medicationOther?.trim(),
+    {
+      message: "投薬名を選んでください",
+      path: ["medicationId"],
+    },
+  );
 
 export type HealthRecordInput = z.input<typeof healthRecordInputSchema>;
+
+/**
+ * 健康記録フォームの画面入力。
+ *
+ * API は POST /animals/{animalId}/health-records で1頭ずつ受ける設計だが、
+ * 画面は「同じ内容を3頭にまとめて記録」する（モックアップ s_f_health.html）。
+ * そのため対象個体と、DB/API に列を持たない補助項目をここで別に持ち、
+ * 送信時は個体ごとに healthRecordInputSchema の形へ分解する。
+ *
+ * lotNo（ロット番号）と veterinarian（担当獣医師）は
+ * モックアップにあるが schema.sql・openapi.yaml のどちらにも対応する項目が無い。
+ * 現状は note に含めて送る想定。項目として残すなら DB/API 側の追加が必要。
+ */
+export const healthRecordFormSchema = healthRecordInputSchema.safeExtend({
+  animalIds: z.array(z.string()).min(1, "対象の個体を選んでください"),
+  lotNo: z.string().max(50).optional(),
+  veterinarian: z.string().max(100).optional(),
+});
+
+export type HealthRecordForm = z.input<typeof healthRecordFormSchema>;
 
 /**
  * 日次点検（openapi.yaml InspectionInput / FR-29）。
@@ -184,13 +251,16 @@ export type WeightInput = z.input<typeof weightInputSchema>;
 export const saleInputSchema = z.object({
   soldOn: isoDateSchema,
   salePrice: z.coerce.number().int().min(0).optional(),
-  buyerType: z.enum(["consumer", "business", "auction"]),
+  buyerType: z.enum(BUYER_TYPE),
   importantMattersExplainedOn: isoDateSchema.optional(),
   salesRepName: z.string().max(100).optional(),
   lawComplianceConfirmed: z.literal(true, {
     message: "法令遵守の確認にチェックしてください",
   }),
   buyerName: z.string().max(100).optional(),
+  buyerLicenseNo: z.string().max(50).optional(),
+  buyerPostalCode: z.string().max(10).optional(),
+  buyerAddress: z.string().max(200).optional(),
   buyerPhone: z.string().max(30).optional(),
   buyerEmail: z.email("メールアドレスの形式が正しくありません").optional(),
 });
@@ -282,3 +352,226 @@ export const birthInputSchema = z.object({
 });
 
 export type BirthInput = z.input<typeof birthInputSchema>;
+
+/**
+ * 事業所間移動（openapi.yaml TransferInput / FR-28）。
+ * 自事業所が移動元または移動先である必要がある（検証はサーバ側）。
+ */
+export const transferInputSchema = z
+  .object({
+    animalId: z.string().min(1, "対象の個体を選んでください"),
+    movedOn: isoDateSchema,
+    arrivedOn: isoDateSchema.optional(),
+    toOfficeId: z.string().min(1, "移動先の事業所を選んでください"),
+  })
+  .refine((v) => !v.arrivedOn || v.arrivedOn >= v.movedOn, {
+    message: "到着日は移動日以降の日付を入力してください",
+    path: ["arrivedOn"],
+  });
+
+export type TransferInput = z.input<typeof transferInputSchema>;
+
+/** 交配1回ぶん（openapi.yaml BreedingRecordInput.matings[]）。最大3回まで記録する */
+export const matingEntrySchema = z.object({
+  seq: z.coerce.number().int().min(1).max(3),
+  matedOn: isoDateSchema,
+  methodNote: z.string().max(200).optional(),
+  note: z.string().max(500).optional(),
+});
+
+/**
+ * 繁殖実施（openapi.yaml BreedingRecordInput / FR-40・FR-44）。
+ * 予約（planned）から出産（delivered）までを同一レコードの状態遷移として扱う。
+ */
+export const breedingRecordInputSchema = z
+  .object({
+    status: z.enum(BREEDING_STATUS).default("planned"),
+    /** 交配チェックの結果からそのまま作成する場合に指定 */
+    matingCheckId: z.string().optional(),
+    estrusOn: isoDateSchema.optional(),
+    damId: z.string().min(1, "母個体を選んでください"),
+
+    isRentalSire: z.boolean().default(false),
+    sireId: z.string().optional(),
+    extSireBreed: z.string().max(100).optional(),
+    extSireCallName: z.string().max(100).optional(),
+    extSireMicrochipNo: microchipNoSchema.optional(),
+
+    matings: z.array(matingEntrySchema).max(3).optional(),
+
+    deliveredOn: isoDateSchema.optional(),
+    birthCount: z.coerce.number().int().min(0).optional(),
+    newbornHealthy: z.coerce.number().int().min(0).optional(),
+    newbornSick: z.coerce.number().int().min(0).optional(),
+    newbornDead: z.coerce.number().int().min(0).optional(),
+    damCondition: z.string().max(500).optional(),
+    deliveryNote: z.string().max(1000).optional(),
+
+    damBreedingAvailable: z.boolean().optional(),
+    damBreedingUnavailableOn: isoDateSchema.optional(),
+    sireBreedingAvailable: z.boolean().optional(),
+    sireBreedingUnavailableOn: isoDateSchema.optional(),
+  })
+  .refine(
+    // レンタルなら外部オス情報、自家なら sireId（schema.sql br_sire_chk）
+    (v) =>
+      v.isRentalSire ? !!v.extSireCallName?.trim() && !v.sireId : !!v.sireId,
+    {
+      message: "父個体を選ぶか、外部種オスの呼び名を入力してください",
+      path: ["sireId"],
+    },
+  )
+  .refine(
+    // 出産済なら出産日と出産数を持つ（schema.sql br_delivered_chk）
+    (v) =>
+      !["delivered", "registered"].includes(v.status) ||
+      (!!v.deliveredOn && v.birthCount !== undefined),
+    {
+      message: "出産を登録するときは出産日と出産数が必要です",
+      path: ["deliveredOn"],
+    },
+  )
+  .refine(
+    // 新生子の内訳合計は出産数と一致する（schema.sql br_newborn_sum_chk）
+    (v) => {
+      if (v.birthCount === undefined) return true;
+      const sum =
+        Number(v.newbornHealthy ?? 0) +
+        Number(v.newbornSick ?? 0) +
+        Number(v.newbornDead ?? 0);
+      return sum === Number(v.birthCount);
+    },
+    {
+      message: "健康・病気・死亡の合計を出産数と一致させてください",
+      path: ["newbornHealthy"],
+    },
+  );
+
+export type BreedingRecordInput = z.input<typeof breedingRecordInputSchema>;
+
+/**
+ * 子個体の一括登録（openapi.yaml OffspringInput / FR-41）。
+ * 生年月日・親・管理帳簿番号はサーバ側が繁殖実施レコードから確定するため送らない。
+ */
+export const offspringInputSchema = z.object({
+  sex: z.enum(SEX),
+  callName: z.string().min(1, "呼び名を入力してください").max(100),
+  breedId: z.string().optional(),
+  coatColorId: z.string().optional(),
+  coatColorOther: z.string().max(100).optional(),
+  microchipNo: microchipNoSchema.optional(),
+});
+
+export type OffspringInput = z.input<typeof offspringInputSchema>;
+
+/** 子個体をまとめて登録する画面用 */
+export const offspringBulkSchema = z.object({
+  offspring: z.array(offspringInputSchema).min(1, "1頭以上を入力してください"),
+});
+
+export type OffspringBulk = z.input<typeof offspringBulkSchema>;
+
+/**
+ * 生年月日変更依頼（openapi.yaml の birthdate-change-requests / FR-26）。
+ * 登録後一定期間を過ぎた個体は直接変更できず、協会へ申請する。
+ */
+export const birthdateChangeRequestSchema = z.object({
+  newBirthDate: isoDateSchema,
+  reason: z
+    .string()
+    .min(1, "変更の理由を入力してください")
+    .max(500, "理由は500文字以内で入力してください"),
+});
+
+export type BirthdateChangeRequestInput = z.input<
+  typeof birthdateChangeRequestSchema
+>;
+
+/** 交配チェック（openapi.yaml /mating-checks / FR-43） */
+export const matingCheckRequestSchema = z.object({
+  damId: z.string().min(1, "母個体を選んでください"),
+  sireId: z.string().optional(),
+  plannedMatingOn: isoDateSchema,
+});
+
+export type MatingCheckRequest = z.input<typeof matingCheckRequestSchema>;
+
+/**
+ * 契約の作成（画面 /contracts/new・要件 §8「販売確認書」）。
+ * 8週齢の判定は evaluateCompliance で画面側が事前に行うため、ここでは形式チェックのみ行う。
+ */
+export const contractInputSchema = z.object({
+  animalId: z.string().min(1, "対象の個体を選んでください"),
+  customerName: z
+    .string()
+    .min(1, "お客さまの名前を入力してください")
+    .max(100, "100文字以内で入力してください"),
+  price: z.coerce
+    .number({ message: "販売価格を数値で入力してください" })
+    .int("販売価格は整数で入力してください")
+    .min(0, "販売価格は0以上で入力してください"),
+  deposit: z.coerce
+    .number({ message: "手付金を数値で入力してください" })
+    .int("手付金は整数で入力してください")
+    .min(0, "手付金は0以上で入力してください")
+    .optional(),
+  handoverOn: isoDateSchema,
+  healthGuarantee: z.enum(["30", "60", "none"]),
+});
+
+export type ContractInput = z.input<typeof contractInputSchema>;
+
+/** スタッフの追加（画面 /staff/new・FR-11） */
+export const staffInputSchema = z.object({
+  name: z
+    .string()
+    .min(1, "氏名を入力してください")
+    .max(100, "100文字以内で入力してください"),
+  email: z.email("メールアドレスの形式が正しくありません"),
+  employment: z.enum(["常勤", "非常勤", "外部"]),
+  role: z.enum(USER_ROLE),
+  qualification: z.string().max(100, "100文字以内で入力してください").optional(),
+});
+
+export type StaffInput = z.input<typeof staffInputSchema>;
+
+/**
+ * 定期報告の作成（画面 /reports/new・FR-50・要件 §8）。
+ * 帳票の集計値は帳簿から自動算出するため、ここではどの年度・帳票かの選択だけを持つ。
+ */
+export const reportInputSchema = z.object({
+  fiscalYear: z.enum(["2026", "2025", "2024"]),
+  reportKind: z.enum([
+    "annual_report",
+    "retire_check",
+    "inspection_ledger",
+  ] as const satisfies readonly (typeof REPORT_KIND)[number][]),
+});
+
+export type ReportInput = z.input<typeof reportInputSchema>;
+
+/**
+ * チップ情報の編集（画面 animals/[id]/chip）。
+ * animalInputSchema のマイクロチップ群だけを切り出したもの。
+ * 登録日は装着日以降でなければならない制約（schema.sql）を animalInputSchema と同様に持つ。
+ */
+export const chipEditSchema = z
+  .object({
+    microchipNo: microchipNoSchema,
+    microchipImplantedOn: isoDateSchema,
+    microchipRegisteredOn: isoDateSchema.optional(),
+    neuterStatus: z.enum(NEUTER_STATUS).default("unknown"),
+    rabiesLicenseOn: isoDateSchema.optional(),
+    rabiesTagNo: z.string().max(50).optional(),
+  })
+  .refine(
+    (v) =>
+      !v.microchipRegisteredOn ||
+      v.microchipRegisteredOn >= v.microchipImplantedOn,
+    {
+      message: "登録日は装着日以降の日付を入力してください",
+      path: ["microchipRegisteredOn"],
+    },
+  );
+
+export type ChipEditInput = z.input<typeof chipEditSchema>;

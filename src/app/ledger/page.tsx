@@ -3,6 +3,8 @@
  * 状態が要らないため Server Component。
  */
 
+import Link from "next/link";
+
 import { PageBody, Panel, PanelHeader, StatBlock } from "@/components/domain/page-parts";
 import { LedgerReasonChip } from "@/components/compliance/ledger-reason-chip";
 import { Button } from "@/components/ui/button";
@@ -38,10 +40,21 @@ export default function LedgerPage() {
               <Button variant="outline" size="sm" className="h-9 bg-card">
                 2026年度 ▾
               </Button>
-              <Button variant="outline" size="sm" className="h-9 bg-card">
+              <Button
+                nativeButton={false}
+                render={<Link href="/ledger/new" />}
+                variant="outline"
+                size="sm"
+                className="h-9 bg-card"
+              >
                 ＋ 手動で記載
               </Button>
-              <Button size="sm" className="h-9 bg-[#23262a] text-white hover:bg-[#23262a]/85">
+              <Button
+                nativeButton={false}
+                render={<Link href="/reports/new" />}
+                size="sm"
+                className="h-9 bg-[#23262a] text-white hover:bg-[#23262a]/85"
+              >
                 定期報告を作成
               </Button>
             </div>
