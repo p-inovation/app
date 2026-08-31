@@ -72,3 +72,4 @@ DB側のビュー `pet.v_animal_compliance`（`docs/system_plan/schema/schema.sq
 ## 現状
 
 UI のみ。API は未接続で、データは `lib/mock/` の固定値。フォーム送信は toast を出すだけ。
+# app
